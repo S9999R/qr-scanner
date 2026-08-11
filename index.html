@@ -40,7 +40,6 @@
   #reader { width: 100%; border-radius: 10px; overflow: hidden; }
   #qrImg { width: 100%; max-width: 280px; margin: 16px auto 4px; display: block; background: #fff; border-radius: 10px; }
   #decoded { word-break: break-all; background: #1c1c1c; padding: 12px; border-radius: 10px; }
-  #decoded a { color: #6bb0ff; }
   .err { color: #ff8080; }
   .hint { font-size: .85rem; color: #999; text-align: center; }
 </style>
@@ -65,6 +64,7 @@
     <p id="decodedText"></p>
     <a id="decodedLink" class="btn" target="_blank" rel="noopener noreferrer" data-ar="فتح الرابط" hidden>Open link</a>
     <button id="copyBtn" data-ar="نسخ">Copy</button>
+    <p id="copyMsg" class="hint" hidden></p>
   </div>
 </section>
 
@@ -92,6 +92,9 @@ const T = {
   start:  ['Start camera', 'تشغيل الكاميرا'],
   stop:   ['Stop camera', 'إيقاف الكاميرا'],
   qrAlt:  ['Your QR code', 'رمز QR الخاص بك'],
+  copied: ['Link copied!', 'تم نسخ الرابط!'],
+  copyFail: ['Copy failed — long-press the text above to copy it.',
+             'تعذّر النسخ — اضغط مطولًا على النص أعلاه لنسخه.'],
   camErr: ['Camera unavailable. Needs HTTPS and camera permission. On iPhone, open this page in Safari or Chrome directly — in-app browsers (Instagram, Facebook) block the camera.',
            'الكاميرا غير متاحة. تحتاج الصفحة إلى HTTPS وإذن الكاميرا. على الآيفون، افتح الصفحة في Safari أو Chrome مباشرة — المتصفحات داخل التطبيقات (انستقرام، فيسبوك) تمنع الكاميرا.'],
   qrErr:  ["Couldn't make a QR code from that (too long?).",
@@ -170,7 +173,16 @@ async function onScan(text) {
   } catch {}
 }
 
-$('copyBtn').onclick = () => navigator.clipboard.writeText($('decodedText').textContent);
+let copyTimer;
+$('copyBtn').onclick = async () => {
+  const msg = $('copyMsg');
+  // Only claim success if the write actually resolved — clipboard can be blocked.
+  try { await navigator.clipboard.writeText($('decodedText').textContent); msg.textContent = t('copied'); }
+  catch { msg.textContent = t('copyFail'); }
+  msg.hidden = false;
+  clearTimeout(copyTimer);                                  // rapid clicks shouldn't cut the message short
+  copyTimer = setTimeout(() => { msg.hidden = true; }, 2000);
+};
 
 // --- make ---
 $('makeBtn').onclick = () => {
