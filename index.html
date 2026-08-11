@@ -1,13 +1,13 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>QR Scanner &amp; Maker</title>
+<title data-ar="قارئ ومنشئ رمز QR">QR Scanner &amp; Maker</title>
 <style>
   * { box-sizing: border-box; }
   body {
-    margin: 0; padding: 16px;
+    margin: 0; padding: 64px 16px 16px;
     max-width: 480px; margin-inline: auto;
     font: 16px/1.5 system-ui, sans-serif;
     background: #111; color: #eee;
@@ -29,6 +29,13 @@
   nav { display: flex; gap: 8px; margin-bottom: 16px; }
   nav button { background: #333; }
   nav button.on { background: #2d7ff9; }
+  /* Stays physically top-left in both languages, so it never jumps on switch. */
+  #langBtn {
+    position: fixed; top: 12px; left: 12px;
+    width: 44px; height: 44px; min-height: 0;
+    margin: 0; padding: 0;
+    background: #333; font-size: 1.15rem; line-height: 1;
+  }
   section[hidden], [hidden] { display: none; }
   #reader { width: 100%; border-radius: 10px; overflow: hidden; }
   #qrImg { width: 100%; max-width: 280px; margin: 16px auto 4px; display: block; background: #fff; border-radius: 10px; }
@@ -40,11 +47,13 @@
 </head>
 <body>
 
-<h1>QR Scanner &amp; Maker</h1>
+<button id="langBtn" aria-label="Change language">ع</button>
+
+<h1 data-ar="قارئ ومنشئ رمز QR">QR Scanner &amp; Maker</h1>
 
 <nav>
-  <button id="tabScan" class="on">Scan</button>
-  <button id="tabMake">Make</button>
+  <button id="tabScan" class="on" data-ar="مسح">Scan</button>
+  <button id="tabMake" data-ar="إنشاء">Make</button>
 </nav>
 
 <!-- Scan -->
@@ -54,20 +63,20 @@
   <p id="scanErr" class="err"></p>
   <div id="decoded" hidden>
     <p id="decodedText"></p>
-    <a id="decodedLink" class="btn" target="_blank" rel="noopener noreferrer" hidden>Open link</a>
-    <button id="copyBtn">Copy</button>
+    <a id="decodedLink" class="btn" target="_blank" rel="noopener noreferrer" data-ar="فتح الرابط" hidden>Open link</a>
+    <button id="copyBtn" data-ar="نسخ">Copy</button>
   </div>
 </section>
 
 <!-- Make -->
 <section id="make" hidden>
   <input id="urlInput" type="url" inputmode="url" placeholder="https://example.com" autocomplete="off">
-  <button id="makeBtn">Make QR code</button>
+  <button id="makeBtn" data-ar="إنشاء رمز QR">Make QR code</button>
   <p id="makeErr" class="err"></p>
   <div id="madeQr" hidden>
     <img id="qrImg" alt="Your QR code">
-    <a id="dlBtn" class="btn" download="qr.png">Download</a>
-    <p class="hint">On iPhone you can also long-press the code &rarr; Save to Photos.</p>
+    <a id="dlBtn" class="btn" download="qr.png" data-ar="تنزيل">Download</a>
+    <p class="hint" data-ar="على الآيفون: اضغط مطولًا على الرمز ثم اختر «حفظ الصورة».">On iPhone you can also long-press the code &rarr; Save to Photos.</p>
   </div>
 </section>
 
@@ -76,6 +85,39 @@
 import QRCode from 'https://cdn.jsdelivr.net/npm/qrcode@1.5.4/+esm';
 
 const $ = id => document.getElementById(id);
+
+// --- language ---
+// Static text lives in data-ar attributes. Only strings set from JS need to live here.
+const T = {
+  start:  ['Start camera', 'تشغيل الكاميرا'],
+  stop:   ['Stop camera', 'إيقاف الكاميرا'],
+  qrAlt:  ['Your QR code', 'رمز QR الخاص بك'],
+  camErr: ['Camera unavailable. Needs HTTPS and camera permission. On iPhone, open this page in Safari or Chrome directly — in-app browsers (Instagram, Facebook) block the camera.',
+           'الكاميرا غير متاحة. تحتاج الصفحة إلى HTTPS وإذن الكاميرا. على الآيفون، افتح الصفحة في Safari أو Chrome مباشرة — المتصفحات داخل التطبيقات (انستقرام، فيسبوك) تمنع الكاميرا.'],
+  qrErr:  ["Couldn't make a QR code from that (too long?).",
+           'تعذّر إنشاء رمز QR من هذا النص (ربما يكون طويلًا جدًا).']
+};
+
+let ar = navigator.language.startsWith('ar');          // first visit follows the phone's language
+try { if (localStorage.lang) ar = localStorage.lang === 'ar'; } catch {}   // Safari private mode can throw
+
+const t = k => T[k][+ar];
+
+function setLang(next) {
+  ar = next;
+  try { localStorage.lang = ar ? 'ar' : 'en'; } catch {}
+  const html = document.documentElement;
+  html.lang = ar ? 'ar' : 'en';
+  html.dir = ar ? 'rtl' : 'ltr';                       // dir flips the whole layout natively — no RTL CSS needed
+  document.querySelectorAll('[data-ar]').forEach(el => {
+    el.dataset.en ??= el.textContent.trim();           // capture the English once, on first switch
+    el.textContent = ar ? el.dataset.ar : el.dataset.en;
+  });
+  $('langBtn').textContent = ar ? 'E' : 'ع';           // button shows the language you'd switch TO
+  $('startBtn').textContent = t(scanning ? 'stop' : 'start');
+  $('qrImg').alt = t('qrAlt');
+}
+$('langBtn').onclick = () => setLang(!ar);
 
 // --- tabs ---
 function show(scanOn) {
@@ -95,7 +137,7 @@ let scanning = false;
 async function stopScan() {
   if (!scanning) return;
   scanning = false;
-  $('startBtn').textContent = 'Start camera';
+  $('startBtn').textContent = t('start');
   try { await qr.stop(); } catch {}
 }
 
@@ -106,10 +148,9 @@ $('startBtn').onclick = async () => {
     // facingMode: rear camera, or phones open the selfie cam
     await qr.start({ facingMode: 'environment' }, { fps: 10, qrbox: 250 }, onScan, () => {});
     scanning = true;
-    $('startBtn').textContent = 'Stop camera';
+    $('startBtn').textContent = t('stop');
   } catch {
-    $('scanErr').textContent =
-      'Camera unavailable. Needs HTTPS and camera permission. On iPhone, open this page in Safari or Chrome directly — in-app browsers (Instagram, Facebook) block the camera.';
+    $('scanErr').textContent = t('camErr');
   }
 };
 
@@ -136,12 +177,14 @@ $('makeBtn').onclick = () => {
   const text = $('urlInput').value.trim();
   if (!text) return;
   QRCode.toDataURL(text, { width: 280, margin: 2 }, (err, url) => {
-    $('makeErr').textContent = err ? "Couldn't make a QR code from that (too long?)." : '';
+    $('makeErr').textContent = err ? t('qrErr') : '';
     $('madeQr').hidden = !!err;
     if (!err) { $('qrImg').src = url; $('dlBtn').href = url; }
   });
 };
 $('urlInput').onkeydown = e => { if (e.key === 'Enter') $('makeBtn').click(); };
+
+setLang(ar);   // must run last — it reads `scanning` and touches every element above
 </script>
 
 </body>
